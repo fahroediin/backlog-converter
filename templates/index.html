@@ -10,8 +10,9 @@
         h1, h2 { color: #2c3e50; }
         textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: "Courier New", Courier, monospace; font-size: 14px; box-sizing: border-box; }
         #backlog_text { height: 250px; }
-        button#convertBtn { display: block; width: 100%; padding: 12px; margin: 20px 0; background-color: #3498db; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
-        button#convertBtn:hover { background-color: #2980b9; }
+        button { display: block; width: 100%; padding: 12px; margin: 20px 0; background-color: #3498db; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #2980b9; }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
         .area-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .area-header h2 { margin: 0; }
         .output-header { margin-top: 30px; }
@@ -25,92 +26,161 @@
         #outputPreview th, #outputPreview td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; white-space: pre-wrap; }
         #outputPreview th { background-color: #e9ecef; font-weight: bold; position: sticky; top: 0; }
         #outputPreview tr:nth-child(even) { background-color: #f9f9f9; }
-        .error { margin-top: 20px; padding: 15px; border-radius: 5px; background-color: #ffebee; border: 1px solid #ef9a9a; color: #c62828; }
+        .message-box { margin-top: 20px; padding: 15px; border-radius: 5px; display: none; }
+        .error { background-color: #ffebee; border: 1px solid #ef9a9a; color: #c62828; }
+        .info { background-color: #e3f2fd; border: 1px solid #90caf9; color: #1e88e5; }
         label { font-weight: bold; display: block; margin-bottom: 8px; }
         input[type="password"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; margin-bottom: 15px; }
+        .input-header { display: flex; justify-content: space-between; align-items: center; }
+        #clear-btn { width: auto; padding: 5px 10px; font-size: 12px; background-color: #e74c3c; margin: 0; }
+        #clear-btn:hover { background-color: #c0392b; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Backlog to Epic Converter</h1>
         
-        <form method="POST">
+        <div id="form-container">
             <label for="api_key">Google Gemini API Key:</label>
-            <input type="password" id="api_key" name="api_key" placeholder="Masukkan API Key Anda di sini" required>
+            <input type="password" id="api_key" placeholder="Masukkan API Key Anda di sini" required>
 
-            <label for="backlog_text">Input Text</label>
-            <textarea id="backlog_text" name="backlog_text" placeholder="Tempel backlog mentah Anda di sini..." required>{{ request.form['backlog_text'] }}</textarea>
-            
-            <button id="convertBtn" type="submit">Convert</button>
-        </form>
-
-        {% if error %}
-            <div class="error"><strong>Error:</strong> {{ error }}</div>
-        {% endif %}
-
-        {% if headers and rows %}
-        <div class="area-header output-header">
-            <h2>Preview</h2>
-            <div class="copy-container">
-                <span id="copy-feedback">Copied!</span>
-                <button type="button" id="copy-button" class="icon-button" title="Copy for Google Sheets">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-                </button>
+            <div class="input-header">
+                <label for="backlog_text">Input Text</label>
+                <button id="clear-btn">Clear</button>
             </div>
+            <textarea id="backlog_text" placeholder="Tempel backlog mentah Anda di sini..." required></textarea>
+            
+            <button id="convertBtn">Convert</button>
         </div>
-        <div id="outputPreview">
-            <table>
-                <thead>
-                    <tr>
-                        {% for header in headers %}
-                            <th>{{ header }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in rows %}
-                    <tr>
-                        {% for cell in row %}
-                            <td>{{ cell }}</td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- ELEMEN TERSEMBUNYI UNTUK MENYIMPAN DATA COPY -->
-        <textarea id="tsv-data-for-copy" style="display:none;">{{ tsv_data }}</textarea>
 
-        {% endif %}
+        <div id="message-box" class="message-box"></div>
+
+        <div id="result-container" style="display: none;">
+            <div class="area-header output-header">
+                <h2>Preview</h2>
+                <div class="copy-container">
+                    <span id="copy-feedback">Copied!</span>
+                    <button id="copy-button" class="icon-button" title="Copy for Google Sheets">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div id="outputPreview"></div>
+        </div>
     </div>
 
     <script>
-        // Ambil tombol copy jika ada
+        // --- ELEMEN DOM ---
+        const apiKeyInput = document.getElementById('api_key');
+        const backlogInput = document.getElementById('backlog_text');
+        const convertBtn = document.getElementById('convertBtn');
+        const clearBtn = document.getElementById('clear-btn');
+        const resultContainer = document.getElementById('result-container');
+        const outputPreview = document.getElementById('outputPreview');
         const copyButton = document.getElementById('copy-button');
+        const copyFeedback = document.getElementById('copy-feedback');
+        const messageBox = document.getElementById('message-box');
+        let tsvDataToCopy = '';
 
-        // Tambahkan event listener hanya jika tombolnya ada di halaman
-        if (copyButton) {
-            copyButton.addEventListener('click', () => {
-                const tsvTextarea = document.getElementById('tsv-data-for-copy');
-                
-                if (!tsvTextarea || !tsvTextarea.value) {
-                    alert('Tidak ada data untuk disalin.');
-                    return;
+        // --- FUNGSI ---
+        function showMessage(text, type = 'info') {
+            messageBox.textContent = text;
+            messageBox.className = `message-box ${type}`;
+            messageBox.style.display = 'block';
+        }
+
+        function hideMessage() {
+            messageBox.style.display = 'none';
+        }
+
+        function renderTable(headers, rows) {
+            let tableHTML = '<table><thead><tr>';
+            headers.forEach(h => { tableHTML += `<th>${h}</th>`; });
+            tableHTML += '</tr></thead><tbody>';
+            rows.forEach(row => {
+                tableHTML += '<tr>';
+                row.forEach(cell => { tableHTML += `<td>${cell}</td>`; });
+                tableHTML += '</tr>';
+            });
+            tableHTML += '</tbody></table>';
+            outputPreview.innerHTML = tableHTML;
+            resultContainer.style.display = 'block';
+        }
+
+        // --- LOGIKA UTAMA ---
+        // Muat API key dari sessionStorage saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedApiKey = sessionStorage.getItem('geminiApiKey');
+            if (savedApiKey) {
+                apiKeyInput.value = savedApiKey;
+            }
+        });
+
+        // Simpan API key ke sessionStorage setiap kali diubah
+        apiKeyInput.addEventListener('input', () => {
+            sessionStorage.setItem('geminiApiKey', apiKeyInput.value);
+        });
+
+        // Tombol Clear
+        clearBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            backlogInput.value = '';
+        });
+
+        // Tombol Convert (AJAX)
+        convertBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            hideMessage();
+            resultContainer.style.display = 'none';
+            convertBtn.disabled = true;
+            convertBtn.textContent = 'Processing...';
+
+            const payload = {
+                api_key: apiKeyInput.value,
+                backlog_text: backlogInput.value
+            };
+
+            try {
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || `HTTP error! status: ${response.status}`);
                 }
 
-                // Gunakan API Clipboard yang modern
-                navigator.clipboard.writeText(tsvTextarea.value).then(() => {
-                    const feedback = document.getElementById('copy-feedback');
-                    feedback.style.opacity = '1';
-                    setTimeout(() => {
-                        feedback.style.opacity = '0';
-                    }, 2000);
-                }).catch(err => {
-                    alert('Gagal menyalin teks: ', err);
-                });
+                if (result.success) {
+                    renderTable(result.headers, result.rows);
+                    tsvDataToCopy = result.tsv_data;
+                } else {
+                    showMessage(result.error, 'error');
+                }
+
+            } catch (error) {
+                showMessage(error.message, 'error');
+            } finally {
+                convertBtn.disabled = false;
+                convertBtn.textContent = 'Convert';
+            }
+        });
+
+        // Tombol Copy
+        copyButton.addEventListener('click', () => {
+            if (!tsvDataToCopy) {
+                alert('Tidak ada data untuk disalin.');
+                return;
+            }
+            navigator.clipboard.writeText(tsvDataToCopy).then(() => {
+                copyFeedback.style.opacity = '1';
+                setTimeout(() => { copyFeedback.style.opacity = '0'; }, 2000);
+            }).catch(err => {
+                alert('Gagal menyalin teks: ', err);
             });
-        }
+        });
     </script>
 </body>
 </html>
